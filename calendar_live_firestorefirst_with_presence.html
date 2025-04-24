@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang='en'><head>
+<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>2025 Live-Editable Calendar</title>
+<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap' rel='stylesheet'>
+<style>
+body{margin:0;font-family:'Inter',sans-serif;background:#f4f4f9;}
+.sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,0.1);padding:20px;overflow:auto;}
+.sidebar h2{margin-top:0;font-size:1.2rem;color:#333;}
+.sidebar button{display:block;width:100%;margin:8px 0;padding:6px;background:#eee;border:none;border-radius:4px;text-align:left;cursor:pointer;}
+.toggle-btn{position:fixed;top:20px;left:240px;padding:6px 10px;background:#007bff;color:#fff;border:none;border-radius:4px;cursor:pointer;z-index:1000;}
+.container{margin-left:260px;padding:20px;max-width:1200px;}
+.week-view{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+.day-view{display:none;flex-direction:column;gap:8px;}
+.day-name,.day-cell{border-radius:6px;padding:8px;box-shadow:0 1px 4px rgba(0,0,0,0.1);background:#fff;}
+.day-name{text-align:center;font-weight:600;}
+.day-cell{min-height:80px;display:flex;flex-direction:column;}
+.date{font-weight:700;margin-bottom:4px;color:#555;}
+.activity{margin:2px 0;padding:2px 4px;background:#f0f0f0;border-radius:4px;cursor:move;}
+@media(max-width:900px){.sidebar{display:none;}.toggle-btn{left:10px;}.container{margin-left:0;}.week-view{grid-template-columns:repeat(2,1fr);}}
+@media print{.sidebar,.toggle-btn{display:none;}body{background:#fff;} .day-cell,.day-name{box-shadow:none;}}
+</style>
+  <!-- Firebase Presence Integration -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    import { getDatabase, ref, set, onDisconnect, onValue } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+    
+    // TODO: replace with your Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const firestore = getFirestore(app);
+
+    onAuthStateChanged(auth, async user => {
+      if (!user) return;
+      const userSnap = await getDoc(doc(firestore, 'users', user.uid));
+      const role = userSnap.exists() ? userSnap.data().role : 'viewer';
+      const userRef = ref(db, `onlineUsers/${user.uid}`);
+      set(userRef, {
+        displayName: user.displayName || 'Anonymous',
+        photoURL: user.photoURL || '',
+        role,
+        lastActive: Date.now()
+      });
+      onDisconnect(userRef).remove();
+      setInterval(() => {
+        set(ref(db, `onlineUsers/${user.uid}/lastActive`), Date.now());
+      }, 60000);
+
+      let bar = document.getElementById('people-bar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'people-bar';
+        Object.assign(bar.style, {
+          position: 'fixed', top: '10px', right: '10px',
+          display: 'flex', gap: '4px',
+          background: '#fff', padding: '4px',
+          border: '1px solid #ccc', borderRadius: '4px',
+          zIndex: 1000
+        });
+        document.body.appendChild(bar);
+      }
+      const listRef = ref(db, 'onlineUsers');
+      onValue(listRef, snap => {
+        const data = snap.val() || {};
+        bar.innerHTML = '';
+        Object.values(data).forEach(info => {
+          const img = document.createElement('img');
+          img.src = info.photoURL || '/default-avatar.png';
+          img.alt = info.displayName || 'User';
+          img.title = info.displayName || '';
+          Object.assign(img.style, { width: '32px', height: '32px', borderRadius: '50%' });
+          bar.appendChild(img);
+        });
+      });
+    });
+  </script>
+  <!-- End Firebase Presence Integration -->
+</head><body>
+<div class='sidebar'><h2>Filters</h2>
+<button data-filter='all'>Show All</button>
+<button data-filter='stem'>STEM</button>
+<button data-filter='arts'>Arts</button>
+<button data-filter='wellness'>Wellness</button>
+<button data-filter='leadership'>Leadership</button>
+</div>
+<button class='toggle-btn'>Switch to Day View</button>
+<div class='container'><h1>2025 Program Calendar</h1>
+<div id='week-view' class='week-view'>
+<div class='day-name'>Sunday</div>
+<div class='day-name'>Monday</div>
+<div class='day-name'>Tuesday</div>
+<div class='day-name'>Wednesday</div>
+<div class='day-name'>Thursday</div>
+<div class='day-name'>Friday</div>
+<div class='day-name'>Saturday</div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell'>
+<div class='date'>May 01</div>
+<div class='activity'>Design Thinking Challenge</div>
+<div class='activity'>Speed Debate: Pros & Cons</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 02</div>
+<div class='activity'>STEM Bridge Build</div>
+<div class='activity'>Coding: Create Your First Webpage</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 03</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 04</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 05</div>
+<div class='activity'>Mindfulness Art Collage</div>
+<div class='activity'>Nutrition Label Detective</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 06</div>
+<div class='activity'>Public Speaking: Impromptu Stories</div>
+<div class='activity'>Financial Literacy: Budget Simulation</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 07</div>
+<div class='activity'>Engineering: Marshmallow Tower</div>
+<div class='activity'>Civic Engagement: Mock Council Meeting</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 08</div>
+<div class='activity'>Geography Trivia Race</div>
+<div class='activity'>Creative Writing: Microfiction</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 09</div>
+<div class='activity'>Chemistry vs. Myth: Experiment Busting</div>
+<div class='activity'>Environmental Awareness: Trash Audit</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 10</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 11</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 12</div>
+<div class='activity'>Digital Citizenship Workshop</div>
+<div class='activity'>Music and Mood: Soundscapes</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 13</div>
+<div class='activity'>Physics: Egg Drop Challenge</div>
+<div class='activity'>Art: Perspective Drawing</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 14</div>
+<div class='activity'>Code Debugging Relay</div>
+<div class='activity'>Leadership Styles Role-Play</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 15</div>
+<div class='activity'>Conflict Resolution: Active Listening</div>
+<div class='activity'>Health: Heart Rate Experiments</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 16</div>
+<div class='activity'>Mathematics: Escape Room Codes</div>
+<div class='activity'>Robotics: Build a Tugbot</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 17</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 18</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 19</div>
+<div class='activity'>Historical Debate: Famous Figures</div>
+<div class='activity'>Biology: Seed Germination Lab</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 20</div>
+<div class='activity'>Poetry Slam Prep</div>
+<div class='activity'>Game Theory: Prisoner’s Dilemma</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 21</div>
+<div class='activity'>Social Skills: Compliment Circle</div>
+<div class='activity'>Map Skills: Orienteering</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 22</div>
+<div class='activity'>Stop-Motion Animation Basics</div>
+<div class='activity'>Media Literacy: Fake News</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 23</div>
+<div class='activity'>Trivia: Space Exploration</div>
+<div class='activity'>Peer Mentoring: Advice Panels</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 24</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 25</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 26</div>
+<div class='activity'>Career Exploration: Elevator Pitches</div>
+<div class='activity'>Improv Comedy Games</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 27</div>
+<div class='activity'>Art: Collaborative Mural</div>
+<div class='activity'>Science: Rollercoaster Physics</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 28</div>
+<div class='activity'>Coding: Scratch Interactive Story</div>
+<div class='activity'>Entrepreneurship: Sell Your Idea</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 29</div>
+<div class='activity'>Mindset: Gratitude Journaling</div>
+<div class='activity'>Team Building: Human Knot</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 30</div>
+<div class='activity'>Ecology: Food Chain Role-Play</div>
+<div class='activity'>Photography: Light & Shadow Experiment</div>
+</div>
+<div class='day-cell'>
+<div class='date'>May 31</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 01</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 02</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 03</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 04</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 05</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 06</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 07</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 08</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 09</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 10</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 11</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 12</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 13</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 14</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 15</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 16</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 17</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 18</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 19</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 20</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 21</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 22</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 23</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 24</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 25</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 26</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 27</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 28</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 29</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jun 30</div>
+</div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell'>
+<div class='date'>Jul 01</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 02</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 03</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 04</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 05</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 06</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 07</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 08</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 09</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 10</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 11</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 12</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 13</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 14</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 15</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 16</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 17</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 18</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 19</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 20</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 21</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 22</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 23</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 24</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 25</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 26</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 27</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 28</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 29</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 30</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Jul 31</div>
+</div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell'>
+<div class='date'>Aug 01</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 02</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 03</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 04</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 05</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 06</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 07</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 08</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 09</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 10</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 11</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 12</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 13</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 14</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 15</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 16</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 17</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 18</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 19</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 20</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 21</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 22</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 23</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 24</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 25</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 26</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 27</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 28</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 29</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 30</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Aug 31</div>
+</div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell'>
+<div class='date'>Sep 01</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 02</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 03</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 04</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 05</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 06</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 07</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 08</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 09</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 10</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 11</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 12</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 13</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 14</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 15</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 16</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 17</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 18</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 19</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 20</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 21</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 22</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 23</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 24</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 25</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 26</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 27</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 28</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 29</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Sep 30</div>
+</div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell'>
+<div class='date'>Oct 01</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 02</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 03</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 04</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 05</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 06</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 07</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 08</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 09</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 10</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 11</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 12</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 13</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 14</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 15</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 16</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 17</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 18</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 19</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 20</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 21</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 22</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 23</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 24</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 25</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 26</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 27</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 28</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 29</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 30</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Oct 31</div>
+</div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell'>
+<div class='date'>Nov 01</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 02</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 03</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 04</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 05</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 06</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 07</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 08</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 09</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 10</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 11</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 12</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 13</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 14</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 15</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 16</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 17</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 18</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 19</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 20</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 21</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 22</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 23</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 24</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 25</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 26</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 27</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 28</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 29</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Nov 30</div>
+</div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell'>
+<div class='date'>Dec 01</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 02</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 03</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 04</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 05</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 06</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 07</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 08</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 09</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 10</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 11</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 12</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 13</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 14</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 15</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 16</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 17</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 18</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 19</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 20</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 21</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 22</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 23</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 24</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 25</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 26</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 27</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 28</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 29</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 30</div>
+</div>
+<div class='day-cell'>
+<div class='date'>Dec 31</div>
+</div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+<div class='day-cell empty'></div>
+</div>
+<div id='day-view' class='day-view'>
+<div class='day-cell'><div class='date'>May 01</div><div class='activity'>Design Thinking Challenge</div><div class='activity'>Speed Debate: Pros & Cons</div></div>
+<div class='day-cell'><div class='date'>May 02</div><div class='activity'>STEM Bridge Build</div><div class='activity'>Coding: Create Your First Webpage</div></div>
+<div class='day-cell'><div class='date'>May 03</div></div>
+<div class='day-cell'><div class='date'>May 04</div></div>
+<div class='day-cell'><div class='date'>May 05</div><div class='activity'>Mindfulness Art Collage</div><div class='activity'>Nutrition Label Detective</div></div>
+<div class='day-cell'><div class='date'>May 06</div><div class='activity'>Public Speaking: Impromptu Stories</div><div class='activity'>Financial Literacy: Budget Simulation</div></div>
+<div class='day-cell'><div class='date'>May 07</div><div class='activity'>Engineering: Marshmallow Tower</div><div class='activity'>Civic Engagement: Mock Council Meeting</div></div>
+<div class='day-cell'><div class='date'>May 08</div><div class='activity'>Geography Trivia Race</div><div class='activity'>Creative Writing: Microfiction</div></div>
+<div class='day-cell'><div class='date'>May 09</div><div class='activity'>Chemistry vs. Myth: Experiment Busting</div><div class='activity'>Environmental Awareness: Trash Audit</div></div>
+<div class='day-cell'><div class='date'>May 10</div></div>
+<div class='day-cell'><div class='date'>May 11</div></div>
+<div class='day-cell'><div class='date'>May 12</div><div class='activity'>Digital Citizenship Workshop</div><div class='activity'>Music and Mood: Soundscapes</div></div>
+<div class='day-cell'><div class='date'>May 13</div><div class='activity'>Physics: Egg Drop Challenge</div><div class='activity'>Art: Perspective Drawing</div></div>
+<div class='day-cell'><div class='date'>May 14</div><div class='activity'>Code Debugging Relay</div><div class='activity'>Leadership Styles Role-Play</div></div>
+<div class='day-cell'><div class='date'>May 15</div><div class='activity'>Conflict Resolution: Active Listening</div><div class='activity'>Health: Heart Rate Experiments</div></div>
+<div class='day-cell'><div class='date'>May 16</div><div class='activity'>Mathematics: Escape Room Codes</div><div class='activity'>Robotics: Build a Tugbot</div></div>
+<div class='day-cell'><div class='date'>May 17</div></div>
+<div class='day-cell'><div class='date'>May 18</div></div>
+<div class='day-cell'><div class='date'>May 19</div><div class='activity'>Historical Debate: Famous Figures</div><div class='activity'>Biology: Seed Germination Lab</div></div>
+<div class='day-cell'><div class='date'>May 20</div><div class='activity'>Poetry Slam Prep</div><div class='activity'>Game Theory: Prisoner’s Dilemma</div></div>
+<div class='day-cell'><div class='date'>May 21</div><div class='activity'>Social Skills: Compliment Circle</div><div class='activity'>Map Skills: Orienteering</div></div>
+<div class='day-cell'><div class='date'>May 22</div><div class='activity'>Stop-Motion Animation Basics</div><div class='activity'>Media Literacy: Fake News</div></div>
+<div class='day-cell'><div class='date'>May 23</div><div class='activity'>Trivia: Space Exploration</div><div class='activity'>Peer Mentoring: Advice Panels</div></div>
+<div class='day-cell'><div class='date'>May 24</div></div>
+<div class='day-cell'><div class='date'>May 25</div></div>
+<div class='day-cell'><div class='date'>May 26</div><div class='activity'>Career Exploration: Elevator Pitches</div><div class='activity'>Improv Comedy Games</div></div>
+<div class='day-cell'><div class='date'>May 27</div><div class='activity'>Art: Collaborative Mural</div><div class='activity'>Science: Rollercoaster Physics</div></div>
+<div class='day-cell'><div class='date'>May 28</div><div class='activity'>Coding: Scratch Interactive Story</div><div class='activity'>Entrepreneurship: Sell Your Idea</div></div>
+<div class='day-cell'><div class='date'>May 29</div><div class='activity'>Mindset: Gratitude Journaling</div><div class='activity'>Team Building: Human Knot</div></div>
+<div class='day-cell'><div class='date'>May 30</div><div class='activity'>Ecology: Food Chain Role-Play</div><div class='activity'>Photography: Light & Shadow Experiment</div></div>
+<div class='day-cell'><div class='date'>May 31</div></div>
+<div class='day-cell'><div class='date'>June 01</div></div>
+<div class='day-cell'><div class='date'>June 02</div></div>
+<div class='day-cell'><div class='date'>June 03</div></div>
+<div class='day-cell'><div class='date'>June 04</div></div>
+<div class='day-cell'><div class='date'>June 05</div></div>
+<div class='day-cell'><div class='date'>June 06</div></div>
+<div class='day-cell'><div class='date'>June 07</div></div>
+<div class='day-cell'><div class='date'>June 08</div></div>
+<div class='day-cell'><div class='date'>June 09</div></div>
+<div class='day-cell'><div class='date'>June 10</div></div>
+<div class='day-cell'><div class='date'>June 11</div></div>
+<div class='day-cell'><div class='date'>June 12</div></div>
+<div class='day-cell'><div class='date'>June 13</div></div>
+<div class='day-cell'><div class='date'>June 14</div></div>
+<div class='day-cell'><div class='date'>June 15</div></div>
+<div class='day-cell'><div class='date'>June 16</div></div>
+<div class='day-cell'><div class='date'>June 17</div></div>
+<div class='day-cell'><div class='date'>June 18</div></div>
+<div class='day-cell'><div class='date'>June 19</div></div>
+<div class='day-cell'><div class='date'>June 20</div></div>
+<div class='day-cell'><div class='date'>June 21</div></div>
+<div class='day-cell'><div class='date'>June 22</div></div>
+<div class='day-cell'><div class='date'>June 23</div></div>
+<div class='day-cell'><div class='date'>June 24</div></div>
+<div class='day-cell'><div class='date'>June 25</div></div>
+<div class='day-cell'><div class='date'>June 26</div></div>
+<div class='day-cell'><div class='date'>June 27</div></div>
+<div class='day-cell'><div class='date'>June 28</div></div>
+<div class='day-cell'><div class='date'>June 29</div></div>
+<div class='day-cell'><div class='date'>June 30</div></div>
+<div class='day-cell'><div class='date'>July 01</div></div>
+<div class='day-cell'><div class='date'>July 02</div></div>
+<div class='day-cell'><div class='date'>July 03</div></div>
+<div class='day-cell'><div class='date'>July 04</div></div>
+<div class='day-cell'><div class='date'>July 05</div></div>
+<div class='day-cell'><div class='date'>July 06</div></div>
+<div class='day-cell'><div class='date'>July 07</div></div>
+<div class='day-cell'><div class='date'>July 08</div></div>
+<div class='day-cell'><div class='date'>July 09</div></div>
+<div class='day-cell'><div class='date'>July 10</div></div>
+<div class='day-cell'><div class='date'>July 11</div></div>
+<div class='day-cell'><div class='date'>July 12</div></div>
+<div class='day-cell'><div class='date'>July 13</div></div>
+<div class='day-cell'><div class='date'>July 14</div></div>
+<div class='day-cell'><div class='date'>July 15</div></div>
+<div class='day-cell'><div class='date'>July 16</div></div>
+<div class='day-cell'><div class='date'>July 17</div></div>
+<div class='day-cell'><div class='date'>July 18</div></div>
+<div class='day-cell'><div class='date'>July 19</div></div>
+<div class='day-cell'><div class='date'>July 20</div></div>
+<div class='day-cell'><div class='date'>July 21</div></div>
+<div class='day-cell'><div class='date'>July 22</div></div>
+<div class='day-cell'><div class='date'>July 23</div></div>
+<div class='day-cell'><div class='date'>July 24</div></div>
+<div class='day-cell'><div class='date'>July 25</div></div>
+<div class='day-cell'><div class='date'>July 26</div></div>
+<div class='day-cell'><div class='date'>July 27</div></div>
+<div class='day-cell'><div class='date'>July 28</div></div>
+<div class='day-cell'><div class='date'>July 29</div></div>
+<div class='day-cell'><div class='date'>July 30</div></div>
+<div class='day-cell'><div class='date'>July 31</div></div>
+<div class='day-cell'><div class='date'>August 01</div></div>
+<div class='day-cell'><div class='date'>August 02</div></div>
+<div class='day-cell'><div class='date'>August 03</div></div>
+<div class='day-cell'><div class='date'>August 04</div></div>
+<div class='day-cell'><div class='date'>August 05</div></div>
+<div class='day-cell'><div class='date'>August 06</div></div>
+<div class='day-cell'><div class='date'>August 07</div></div>
+<div class='day-cell'><div class='date'>August 08</div></div>
+<div class='day-cell'><div class='date'>August 09</div></div>
+<div class='day-cell'><div class='date'>August 10</div></div>
+<div class='day-cell'><div class='date'>August 11</div></div>
+<div class='day-cell'><div class='date'>August 12</div></div>
+<div class='day-cell'><div class='date'>August 13</div></div>
+<div class='day-cell'><div class='date'>August 14</div></div>
+<div class='day-cell'><div class='date'>August 15</div></div>
+<div class='day-cell'><div class='date'>August 16</div></div>
+<div class='day-cell'><div class='date'>August 17</div></div>
+<div class='day-cell'><div class='date'>August 18</div></div>
+<div class='day-cell'><div class='date'>August 19</div></div>
+<div class='day-cell'><div class='date'>August 20</div></div>
+<div class='day-cell'><div class='date'>August 21</div></div>
+<div class='day-cell'><div class='date'>August 22</div></div>
+<div class='day-cell'><div class='date'>August 23</div></div>
+<div class='day-cell'><div class='date'>August 24</div></div>
+<div class='day-cell'><div class='date'>August 25</div></div>
+<div class='day-cell'><div class='date'>August 26</div></div>
+<div class='day-cell'><div class='date'>August 27</div></div>
+<div class='day-cell'><div class='date'>August 28</div></div>
+<div class='day-cell'><div class='date'>August 29</div></div>
+<div class='day-cell'><div class='date'>August 30</div></div>
+<div class='day-cell'><div class='date'>August 31</div></div>
+<div class='day-cell'><div class='date'>September 01</div></div>
+<div class='day-cell'><div class='date'>September 02</div></div>
+<div class='day-cell'><div class='date'>September 03</div></div>
+<div class='day-cell'><div class='date'>September 04</div></div>
+<div class='day-cell'><div class='date'>September 05</div></div>
+<div class='day-cell'><div class='date'>September 06</div></div>
+<div class='day-cell'><div class='date'>September 07</div></div>
+<div class='day-cell'><div class='date'>September 08</div></div>
+<div class='day-cell'><div class='date'>September 09</div></div>
+<div class='day-cell'><div class='date'>September 10</div></div>
+<div class='day-cell'><div class='date'>September 11</div></div>
+<div class='day-cell'><div class='date'>September 12</div></div>
+<div class='day-cell'><div class='date'>September 13</div></div>
+<div class='day-cell'><div class='date'>September 14</div></div>
+<div class='day-cell'><div class='date'>September 15</div></div>
+<div class='day-cell'><div class='date'>September 16</div></div>
+<div class='day-cell'><div class='date'>September 17</div></div>
+<div class='day-cell'><div class='date'>September 18</div></div>
+<div class='day-cell'><div class='date'>September 19</div></div>
+<div class='day-cell'><div class='date'>September 20</div></div>
+<div class='day-cell'><div class='date'>September 21</div></div>
+<div class='day-cell'><div class='date'>September 22</div></div>
+<div class='day-cell'><div class='date'>September 23</div></div>
+<div class='day-cell'><div class='date'>September 24</div></div>
+<div class='day-cell'><div class='date'>September 25</div></div>
+<div class='day-cell'><div class='date'>September 26</div></div>
+<div class='day-cell'><div class='date'>September 27</div></div>
+<div class='day-cell'><div class='date'>September 28</div></div>
+<div class='day-cell'><div class='date'>September 29</div></div>
+<div class='day-cell'><div class='date'>September 30</div></div>
+<div class='day-cell'><div class='date'>October 01</div></div>
+<div class='day-cell'><div class='date'>October 02</div></div>
+<div class='day-cell'><div class='date'>October 03</div></div>
+<div class='day-cell'><div class='date'>October 04</div></div>
+<div class='day-cell'><div class='date'>October 05</div></div>
+<div class='day-cell'><div class='date'>October 06</div></div>
+<div class='day-cell'><div class='date'>October 07</div></div>
+<div class='day-cell'><div class='date'>October 08</div></div>
+<div class='day-cell'><div class='date'>October 09</div></div>
+<div class='day-cell'><div class='date'>October 10</div></div>
+<div class='day-cell'><div class='date'>October 11</div></div>
+<div class='day-cell'><div class='date'>October 12</div></div>
+<div class='day-cell'><div class='date'>October 13</div></div>
+<div class='day-cell'><div class='date'>October 14</div></div>
+<div class='day-cell'><div class='date'>October 15</div></div>
+<div class='day-cell'><div class='date'>October 16</div></div>
+<div class='day-cell'><div class='date'>October 17</div></div>
+<div class='day-cell'><div class='date'>October 18</div></div>
+<div class='day-cell'><div class='date'>October 19</div></div>
+<div class='day-cell'><div class='date'>October 20</div></div>
+<div class='day-cell'><div class='date'>October 21</div></div>
+<div class='day-cell'><div class='date'>October 22</div></div>
+<div class='day-cell'><div class='date'>October 23</div></div>
+<div class='day-cell'><div class='date'>October 24</div></div>
+<div class='day-cell'><div class='date'>October 25</div></div>
+<div class='day-cell'><div class='date'>October 26</div></div>
+<div class='day-cell'><div class='date'>October 27</div></div>
+<div class='day-cell'><div class='date'>October 28</div></div>
+<div class='day-cell'><div class='date'>October 29</div></div>
+<div class='day-cell'><div class='date'>October 30</div></div>
+<div class='day-cell'><div class='date'>October 31</div></div>
+<div class='day-cell'><div class='date'>November 01</div></div>
+<div class='day-cell'><div class='date'>November 02</div></div>
+<div class='day-cell'><div class='date'>November 03</div></div>
+<div class='day-cell'><div class='date'>November 04</div></div>
+<div class='day-cell'><div class='date'>November 05</div></div>
+<div class='day-cell'><div class='date'>November 06</div></div>
+<div class='day-cell'><div class='date'>November 07</div></div>
+<div class='day-cell'><div class='date'>November 08</div></div>
+<div class='day-cell'><div class='date'>November 09</div></div>
+<div class='day-cell'><div class='date'>November 10</div></div>
+<div class='day-cell'><div class='date'>November 11</div></div>
+<div class='day-cell'><div class='date'>November 12</div></div>
+<div class='day-cell'><div class='date'>November 13</div></div>
+<div class='day-cell'><div class='date'>November 14</div></div>
+<div class='day-cell'><div class='date'>November 15</div></div>
+<div class='day-cell'><div class='date'>November 16</div></div>
+<div class='day-cell'><div class='date'>November 17</div></div>
+<div class='day-cell'><div class='date'>November 18</div></div>
+<div class='day-cell'><div class='date'>November 19</div></div>
+<div class='day-cell'><div class='date'>November 20</div></div>
+<div class='day-cell'><div class='date'>November 21</div></div>
+<div class='day-cell'><div class='date'>November 22</div></div>
+<div class='day-cell'><div class='date'>November 23</div></div>
+<div class='day-cell'><div class='date'>November 24</div></div>
+<div class='day-cell'><div class='date'>November 25</div></div>
+<div class='day-cell'><div class='date'>November 26</div></div>
+<div class='day-cell'><div class='date'>November 27</div></div>
+<div class='day-cell'><div class='date'>November 28</div></div>
+<div class='day-cell'><div class='date'>November 29</div></div>
+<div class='day-cell'><div class='date'>November 30</div></div>
+<div class='day-cell'><div class='date'>December 01</div></div>
+<div class='day-cell'><div class='date'>December 02</div></div>
+<div class='day-cell'><div class='date'>December 03</div></div>
+<div class='day-cell'><div class='date'>December 04</div></div>
+<div class='day-cell'><div class='date'>December 05</div></div>
+<div class='day-cell'><div class='date'>December 06</div></div>
+<div class='day-cell'><div class='date'>December 07</div></div>
+<div class='day-cell'><div class='date'>December 08</div></div>
+<div class='day-cell'><div class='date'>December 09</div></div>
+<div class='day-cell'><div class='date'>December 10</div></div>
+<div class='day-cell'><div class='date'>December 11</div></div>
+<div class='day-cell'><div class='date'>December 12</div></div>
+<div class='day-cell'><div class='date'>December 13</div></div>
+<div class='day-cell'><div class='date'>December 14</div></div>
+<div class='day-cell'><div class='date'>December 15</div></div>
+<div class='day-cell'><div class='date'>December 16</div></div>
+<div class='day-cell'><div class='date'>December 17</div></div>
+<div class='day-cell'><div class='date'>December 18</div></div>
+<div class='day-cell'><div class='date'>December 19</div></div>
+<div class='day-cell'><div class='date'>December 20</div></div>
+<div class='day-cell'><div class='date'>December 21</div></div>
+<div class='day-cell'><div class='date'>December 22</div></div>
+<div class='day-cell'><div class='date'>December 23</div></div>
+<div class='day-cell'><div class='date'>December 24</div></div>
+<div class='day-cell'><div class='date'>December 25</div></div>
+<div class='day-cell'><div class='date'>December 26</div></div>
+<div class='day-cell'><div class='date'>December 27</div></div>
+<div class='day-cell'><div class='date'>December 28</div></div>
+<div class='day-cell'><div class='date'>December 29</div></div>
+<div class='day-cell'><div class='date'>December 30</div></div>
+<div class='day-cell'><div class='date'>December 31</div></div>
+</div></div>
+<script src='https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js'></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  // enable dragging activities between cells
+  document.querySelectorAll('.day-cell').forEach(function(cell){
+    Sortable.create(cell, { group:'activities', animation:150, draggable:'.activity' });
+  });
+  // filter activities
+  document.querySelectorAll('[data-filter]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var f = this.getAttribute('data-filter');
+      document.querySelectorAll('.activity').forEach(function(act){
+        act.style.display = (f==='all'||act.textContent.includes(f.charAt(0).toUpperCase()+f.slice(1))) ? 'block' : 'none';
+      });
+    });
+  });
+  // view toggle
+  var wv = document.getElementById('week-view'), dv = document.getElementById('day-view'), btn = document.querySelector('.toggle-btn');
+  btn.addEventListener('click', function(){
+    if(wv.style.display !== 'none'){ wv.style.display='none'; dv.style.display='flex'; btn.textContent='Switch to Week View'; }
+    else{ wv.style.display='grid'; dv.style.display='none'; btn.textContent='Switch to Day View'; }
+  });
+});
+</script>
+</body></html>
