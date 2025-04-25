@@ -84,25 +84,42 @@ body{margin:0;font-family:'Inter',sans-serif;background:#f4f4f9;}
     });
   </script>
   <!-- End Firebase Presence Integration -->
-  <style>
-    /* Modal */
-    .modal.hidden       { display: none; }
-    .modal             { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
-    .modal-backdrop    { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
-    .modal-content     { position: relative; background: #fff; max-width: 400px; margin: 10% auto; padding: 1em; border-radius: 8px; }
-    .modal-close       { position: absolute; top: 8px; right: 8px; background: none; border: none; font-size: 1.5em; }
+  <!-- Resource Sidebar & Modal Styles -->
+<style>
+  /* modal hidden by default */
+  .modal.hidden       { display: none; }
+  .modal              { position: fixed; inset: 0; z-index: 10000; }
+  .modal-backdrop     { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
+  .modal-content      { position: relative; background: #fff; max-width: 400px; margin: 10% auto; padding: 1.5em; border-radius: 8px; }
+  .modal-close        { position: absolute; top: 8px; right: 12px; background: none; border: none; font-size: 1.5em; cursor: pointer; }
 
-    /* Sidebar */
-    .sidebar.hidden    { transform: translateX(-100%); }
-    .sidebar           { position: fixed; top: 0; left: 0; width: 280px; height: 100%; background: #f9f9f9; padding: 1em; box-shadow: 2px 0 6px rgba(0,0,0,0.1); transition: transform .3s ease; }
-    .sidebar-close     { background: none; border: none; font-size: 1.2em; }
-    #library-search    { width: 100%; padding: .5em; margin-bottom: .5em; }
-    #library-list      { list-style: none; padding: 0; max-height: calc(100% - 4em); overflow-y: auto; }
-    #library-list li   { margin: .3em 0; }
-    #library-list a    { text-decoration: none; }
-  </style>
+  /* sidebar */
+  .sidebar.hidden     { transform: translateX(-100%); }
+  .sidebar            { position: fixed; top: 0; left: 0; width: 240px !important; max-width: 80%; height: 100%; background: #f9f9f9; padding: 1em; box-shadow: 2px 0 6px rgba(0,0,0,0.1); transition: transform .3s ease; z-index: 9999; }
+  .sidebar-close      { background: none; border: none; font-size: 1.2em; margin-bottom: 0.5em; cursor: pointer; }
+  #library-search     { width: 100%; padding: .5em; margin-bottom: .5em; border: 1px solid #ccc; border-radius: 4px; }
+  #library-list       { list-style: none; padding: 0; max-height: calc(100% - 4em); overflow-y: auto; }
+  #library-list li    { margin: .3em 0; font-size: .9em; }
+
+  /* open-library button */
+  .library-open {
+    position: fixed;
+    top: 1em;
+    right: 1em;
+    padding: 0.5em 1em;
+    font-size: 1rem;
+    border: none;
+    background: #0066cc;
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 10001;
+  }
+</style>
 
 </head><body>
+  <button id="open-library" class="library-open">📚 Documents</button>
+
 <div class='sidebar'><h2>Filters</h2>
 <button data-filter='all'>Show All</button>
 <button data-filter='stem'>STEM</button>
@@ -1220,78 +1237,80 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 });
 </script>
-    <!-- Resource Modal -->
-  <div id="resource-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <button id="modal-close" class="modal-close">&times;</button>
-      <h2 id="modal-title">Activity Resources</h2>
-      <ul id="modal-links"></ul>
-    </div>
+   <!-- Resource Modal -->
+<div id="resource-modal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-content">
+    <button id="modal-close" class="modal-close">&times;</button>
+    <h2 id="modal-title">Activity Resources</h2>
+    <ul id="modal-links"></ul>
   </div>
+</div>
 
-  <!-- Document Library Sidebar -->
-  <div id="doc-library" class="sidebar hidden">
-    <button id="library-toggle" class="sidebar-close">&larr;</button>
-    <h3>Document Library</h3>
-    <input type="search" id="library-search" placeholder="Search resources…">
-    <ul id="library-list"></ul>
-  </div>
+<!-- Document Library Sidebar -->
+<div id="doc-library" class="sidebar hidden">
+  <button id="library-toggle" class="sidebar-close">&larr; Close</button>
+  <h3>Document Library</h3>
+  <input type="search" id="library-search" placeholder="Search resources…">
+  <ul id="library-list"></ul>
+</div>
+
   <script>
-    // Sample data: replace these with your real links
-    const resources = {
-      'Design Thinking Challenge': [
-        { title: 'Lesson Plan (PDF)', url: 'https://example.com/design-thinking.pdf' },
-        { title: 'Slide Deck',      url: 'https://example.com/design-deck.pptx' }
-      ],
-      'STEM Bridge Build': [
-        { title: 'Worksheet',       url: 'https://example.com/bridge-worksheet.docx' }
-      ],
-      // …add entries for every activity
-    };
+  // Map your real activity names to their resource links:
+  const resources = {
+    'Design Thinking Challenge': [
+      { title: 'Lesson Plan (PDF)', url: 'https://example.com/design-thinking.pdf' },
+      { title: 'Slide Deck',      url: 'https://example.com/design-deck.pptx' }
+    ],
+    // …add each activity here
+  };
 
-    // Modal & Sidebar elements
-    const modal      = document.getElementById('resource-modal');
-    const linksList  = document.getElementById('modal-links');
-    const closeBtn   = document.getElementById('modal-close');
-    const sidebar    = document.getElementById('doc-library');
-    const libToggle  = document.getElementById('library-toggle');
-    const libSearch  = document.getElementById('library-search');
-    const libList    = document.getElementById('library-list');
+  // Grab elements
+  const modal      = document.getElementById('resource-modal');
+  const linksList  = document.getElementById('modal-links');
+  const closeBtn   = document.getElementById('modal-close');
+  const sidebar    = document.getElementById('doc-library');
+  const libToggle  = document.getElementById('library-toggle');
+  const libSearch  = document.getElementById('library-search');
+  const libList    = document.getElementById('library-list');
+  const openLibBtn = document.getElementById('open-library');
 
-    // 1) Activity-cell click → open modal
-    document.querySelectorAll('.activity').forEach(el => {
-      el.style.cursor = 'pointer';
-      el.addEventListener('click', () => {
-        const name = el.textContent.trim();
-        const items = resources[name] || [];
-        // populate links
-        linksList.innerHTML = items.length
-          ? items.map(r => `<li><a href="${r.url}" target="_blank">${r.title}</a></li>`).join('')
-          : '<li>No resources available.</li>';
-        document.getElementById('modal-title').textContent = name;
-        modal.classList.remove('hidden');
-      });
+  // 1) Activity cell → modal
+  document.querySelectorAll('.activity').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => {
+      const name = el.textContent.trim();
+      const items = resources[name] || [];
+      linksList.innerHTML = items.length
+        ? items.map(r => `<li><a href="${r.url}" target="_blank">${r.title}</a></li>`).join('')
+        : '<li>No resources available.</li>';
+      document.getElementById('modal-title').textContent = name;
+      modal.classList.remove('hidden');
     });
+  });
 
-    // 2) Close modal
-    closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
-    modal.querySelector('.modal-backdrop').addEventListener('click', () => modal.classList.add('hidden'));
+  // 2) Close modal
+  closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  modal.querySelector('.modal-backdrop')
+       .addEventListener('click', () => modal.classList.add('hidden'));
 
-    // 3) Sidebar toggle
-    libToggle.addEventListener('click', () => sidebar.classList.toggle('hidden'));
+  // 3) Sidebar open/close
+  openLibBtn .addEventListener('click', () => sidebar.classList.remove('hidden'));
+  libToggle   .addEventListener('click', () => sidebar.classList.add('hidden'));
 
-    // 4) Initialize document library with all links
-    function refreshLibrary(filter = '') {
-      const all = Object.entries(resources)
-        .flatMap(([act, arr]) => arr.map(r => ({ act, ...r })))
-        .filter(r => r.title.toLowerCase().includes(filter.toLowerCase()) || r.act.toLowerCase().includes(filter.toLowerCase()));
-      libList.innerHTML = all.length
-        ? all.map(r => `<li><strong>${r.act}:</strong> <a href="${r.url}" target="_blank">${r.title}</a></li>`).join('')
-        : '<li>No matches.</li>';
-    }
-    libSearch.addEventListener('input', () => refreshLibrary(libSearch.value));
-    refreshLibrary();
-  </script>
+  // 4) Populate library list
+  function refreshLibrary(filter = '') {
+    const all = Object.entries(resources)
+      .flatMap(([act, arr]) => arr.map(r => ({ act, ...r })))
+      .filter(r => r.title.toLowerCase().includes(filter.toLowerCase())
+                || r.act.toLowerCase().includes(filter.toLowerCase()));
+    libList.innerHTML = all.length
+      ? all.map(r => `<li><strong>${r.act}:</strong> <a href="${r.url}" target="_blank">${r.title}</a></li>`).join('')
+      : '<li>No matches.</li>';
+  }
+  libSearch.addEventListener('input', () => refreshLibrary(libSearch.value));
+  refreshLibrary();
+</script>
+
 
 </body></html>
